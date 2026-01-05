@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR Code Master: Scan & Refresh</title>
+    <style>
+        :root {
+            --primary-color: #2563eb;
+            --hover-color: #1d4ed8;
+            --bg-color: #f3f4f6;
+            --camera-bg: #000;
+        }
+
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            margin: 0;
+            padding: 10px;
+        }
+
+        .container {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 16px;
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            width: 100%;
+            max-width: 420px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        h2 { margin: 0 0 5px 0; color: #1f2937; }
+        p.subtitle { margin: 0 0 20px 0; color: #6b7280; font-size: 0.9rem; }
+
+        /* --- BUTTONS & ACTIONS --- */
+        .action-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .action-card {
+            background: #f9fafb;
+            border: 2px dashed #d1d5db;
+            border-radius: 12px;
+            padding: 15px;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            color: #4b5563;
+        }
+
+        .action-card:hover {
+            border-color: var(--primary-color);
+            background: #eff6ff;
+            color: var(--primary-color);
+        }
+
+        .action-icon { font-size: 1.5rem; margin-bottom: 5px; }
+
+        input[type="text"] {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #e5e7eb;
+            border-radius: 8px;
+            font-size: 16px;
+            box-sizing: border-box;
+            margin-bottom: 10px;
+        }
+
+        button.main-btn {
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 16px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+        }
+
+        /* --- CAMERA OVERLAY (Modal) --- */
+        #cameraOverlay {
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: black;
+            z-index: 999;
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        #cameraOverlay video {
+            width: 100%;
+            max-width: 600px;
+            height: auto;
+            /* Mirror effect off for QR scanning usually better, but optional */
+        }
+
+        .camera-controls {
+            position: absolute;
+            bottom: 30px;
+            width: 100%;
+            text-align: center;
+        }
+
+        .close-cam-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid white;
+            padding: 10px 30px;
+            border-radius: 30px;
+            cursor: pointer;
+            backdrop-filter: blur(5px);
+        }
+
+        .scan-line {
+            position: absolute;
+            width: 80%;
+            height: 2px;
+            background: red;
+            top: 50%;
+            left: 10%;
+            box-shadow: 0 0 4px red;
+            animation: scanAnim 2s infinite alternate;
+            z-index: 1000;
+        }
+
+        @keyframes scanAnim {
+            0% { top: 30%; }
+            100% { top: 70%; }
+        }
+
+        /* --- OUTPUT AREA --- */
+        #qrcode {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            min-height: 200px;
+        }
+
+        #downloadBtn {
+            background-color: #10b981;
+            margin-top: 15px;
+            display: none;
+            color: white;
+            border: none;
+            padding: 10px;
+            border-radius: 8px;
+            cursor: pointer;
+            width: 100%;
+            font-weight: 600;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h2>QR Refresher</h2>
+        <p class="subtitle">Scan QR Fisik -> Jadi Digital HD</p>
+
+        <div class="action-grid">
+            <div class="action-card" onclick="startCamera()">
+                <div class="action-icon">📷</div>
+                <div>Scan Kamera</div>
+            </div>
+            
+            <div class="action-card" onclick="document.getElementById('fileInput').click()">
+                <div class="action-icon">📂</div>
+                <div>Upload Foto</div>
+                <input type="file" id="fileInput" accept="image/*" hidden onchange="handleFileUpload(this)">
+            </div>
+        </div>
+
+        <input type="text" id="qrText" placeholder="Atau ketik teks manual..." autocomplete="off">
+        <button class="main-btn" onclick="generateQR()">Buat QR Code</button>
+
+        <div id="qrcode"></div>
+        <button id="downloadBtn" onclick="downloadQR()">Download Gambar</button>
+    </div>
+
+    <div id="cameraOverlay">
+        <div class="scan-line"></div>
+        <video id="videoPreview" playsinline></video>
+        <div class="camera-controls">
+            <button class="close-cam-btn" onclick="stopCamera()">Tutup Kamera</button>
+        </div>
+        <canvas id="hiddenCanvas" hidden></canvas>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+
+    <script>
+        const qrContainer = document.getElementById("qrcode");
+        const qrInput = document.getElementById("qrText");
+        const downloadBtn = document.getElementById("downloadBtn");
+        
+        // Variabel Kamera
+        const cameraOverlay = document.getElementById("cameraOverlay");
+        const video = document.getElementById("videoPreview");
+        const canvas = document.getElementById("hiddenCanvas");
+        const ctx = canvas.getContext("2d");
+        let stream = null;
+        let isScanning = false;
+
+        // --- FUNGSI 1: GENERATE QR BARU ---
+        function generateQR() {
+            const text = qrInput.value.trim();
+            if (!text) { alert("Data kosong!"); return; }
+
+            qrContainer.innerHTML = "";
+            downloadBtn.style.display = "none";
+
+            new QRCode(qrContainer, {
+                text: text,
+                width: 200, height: 200,
+                colorDark : "#000000",
+                colorLight : "#ffffff",
+                correctLevel : QRCode.CorrectLevel.H
+            });
+
+            setTimeout(() => { downloadBtn.style.display = "block"; }, 300);
+        }
+
+        // --- FUNGSI 2: UPLOAD FILE ---
+        function handleFileUpload(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    canvas.width = img.width;
+                    canvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    
+                    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                    const code = jsQR(imageData.data, imageData.width, imageData.height);
+
+                    if (code) {
+                        foundQR(code.data);
+                    } else {
+                        alert("QR Code tidak terbaca pada gambar ini.");
+                    }
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
+            input.value = ""; // Reset input
+        }
+
+        // --- FUNGSI 3: LIVE CAMERA ---
+        async function startCamera() {
+            try {
+                // Minta izin kamera (menggunakan kamera belakang 'environment' jika di HP)
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: "environment" } 
+                });
+                
+                video.srcObject = stream;
+                video.setAttribute("playsinline", true); // Penting untuk iPhone
+                video.play();
+                
+                cameraOverlay.style.display = "flex";
+                isScanning = true;
+                requestAnimationFrame(scanLoop);
+                
+            } catch (err) {
+                console.error(err);
+                alert("Gagal membuka kamera. Pastikan izin diberikan atau gunakan HTTPS.");
+            }
+        }
+
+        function stopCamera() {
+            isScanning = false;
+            cameraOverlay.style.display = "none";
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+            }
+        }
+
+        function scanLoop() {
+            if (!isScanning) return;
+
+            if (video.readyState === video.HAVE_ENOUGH_DATA) {
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                
+                const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+                // Coba decode QR
+                const code = jsQR(imageData.data, imageData.width, imageData.height, {
+                    inversionAttempts: "dontInvert",
+                });
+
+                if (code) {
+                    // Jika ketemu
+                    stopCamera();
+                    foundQR(code.data);
+                    return;
+                }
+            }
+            requestAnimationFrame(scanLoop);
+        }
+
+        // --- FUNGSI UMUM ---
+        function foundQR(data) {
+            // Beri efek getar jika di HP (opsional)
+            if (navigator.vibrate) navigator.vibrate(200);
+            
+            qrInput.value = data;
+            alert("QR Ditemukan!\nMembuat ulang versi HD...");
+            generateQR();
+        }
+
+        function downloadQR() {
+            const img = qrContainer.querySelector("img");
+            if (img) {
+                const link = document.createElement("a");
+                link.href = img.src;
+                link.download = "QR_HD.png";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            }
+        }
+    </script>
+</body>
+</html>
