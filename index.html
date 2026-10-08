@@ -216,23 +216,24 @@
         const ctx = canvas.getContext("2d");
         let stream = null;
         let isScanning = false;
-
-        // --- FUNGSI 1: GENERATE QR BARU ---
+        // --- FUNGSI 1: GENERATE QR BARU (VERSI 25x25 MODUL / HD) ---
         function generateQR() {
             const text = qrInput.value.trim();
             if (!text) { alert("Data kosong!"); return; }
-
+        
             qrContainer.innerHTML = "";
             downloadBtn.style.display = "none";
-
+        
+            // Menggunakan correctLevel L (Low) membuat pola titik tetap sedikit (kotak-kotak besar)
             new QRCode(qrContainer, {
                 text: text,
-                width: 200, height: 200,
+                width: 250,         // Ukuran pixel canvas/gambar (misal 250px)
+                height: 250,
                 colorDark : "#000000",
                 colorLight : "#ffffff",
-                correctLevel : QRCode.CorrectLevel.H
+                correctLevel : QRCode.CorrectLevel.L // Low ECC = Pola modul 25x25 (Versi rendah, kotak tebal)
             });
-
+        
             setTimeout(() => { downloadBtn.style.display = "block"; }, 300);
         }
 
